@@ -61,6 +61,7 @@ app.post('/deal', async (req, res) => {
               'F&G',
               'Aetna',
               'CoreBridge'
+              'GTL'
             ].map(c => ({
               text: { type: 'plain_text', text: c },
               value: c
