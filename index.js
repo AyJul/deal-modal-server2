@@ -60,7 +60,7 @@ app.post('/deal', async (req, res) => {
               'American Amicable',
               'F&G',
               'Aetna',
-              'CoreBridge'
+              'CoreBridge',
               'GTL'
             ].map(c => ({
               text: { type: 'plain_text', text: c },
