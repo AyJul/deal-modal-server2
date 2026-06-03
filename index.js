@@ -1,6 +1,5 @@
 const express = require('express');
 const axios = require('axios');
-const qs = require('qs');
  
 const app = express();
 app.use(express.json());
@@ -9,18 +8,23 @@ app.use(express.urlencoded({ extended: true }));
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const WINS_CHANNEL = process.env.WINS_CHANNEL;
  
+console.log('WINS_CHANNEL:', WINS_CHANNEL);
+console.log('SLACK_BOT_TOKEN set:', !!SLACK_BOT_TOKEN);
+ 
 // /deal slash command — opens modal
 app.post('/deal', async (req, res) => {
+  console.log('Received /deal command');
   res.status(200).send('');
  
   const triggerId = req.body.trigger_id;
+  console.log('trigger_id:', triggerId);
  
   const modal = {
     trigger_id: triggerId,
     view: {
       type: 'modal',
       callback_id: 'deal_modal',
-      title: { type: 'plain_text', text: '🏆 Post a Closed Deal' },
+      title: { type: 'plain_text', text: 'Post a Closed Deal' },
       submit: { type: 'plain_text', text: 'Post Deal' },
       close: { type: 'plain_text', text: 'Cancel' },
       blocks: [
@@ -107,8 +111,8 @@ app.post('/deal', async (req, res) => {
             action_id: 'term',
             placeholder: { type: 'plain_text', text: 'Select term...' },
             options: [
-              { text: { type: 'plain_text', text: 'Monthly × 12' }, value: '12' },
-              { text: { type: 'plain_text', text: 'Monthly × 10' }, value: '10' },
+              { text: { type: 'plain_text', text: 'Monthly x 12' }, value: '12' },
+              { text: { type: 'plain_text', text: 'Monthly x 10' }, value: '10' },
               { text: { type: 'plain_text', text: 'One-time / Single Premium' }, value: '1' }
             ]
           }
@@ -118,12 +122,13 @@ app.post('/deal', async (req, res) => {
   };
  
   try {
-    await axios.post('https://slack.com/api/views.open', modal, {
+    const result = await axios.post('https://slack.com/api/views.open', modal, {
       headers: {
         Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
         'Content-Type': 'application/json'
       }
     });
+    console.log('views.open result:', JSON.stringify(result.data));
   } catch (err) {
     console.error('Error opening modal:', err.response?.data || err.message);
   }
@@ -131,10 +136,21 @@ app.post('/deal', async (req, res) => {
  
 // Handle modal submission
 app.post('/interactions', async (req, res) => {
-  const payload = JSON.parse(req.body.payload);
+  console.log('Received interaction');
+  console.log('Body keys:', Object.keys(req.body));
+ 
+  let payload;
+  try {
+    payload = JSON.parse(req.body.payload);
+    console.log('Payload type:', payload.type);
+    console.log('Callback ID:', payload.view?.callback_id);
+  } catch (e) {
+    console.error('Failed to parse payload:', e.message);
+    return res.status(200).send('');
+  }
  
   if (payload.type === 'view_submission' && payload.view.callback_id === 'deal_modal') {
-    res.status(200).send('');
+    res.status(200).json({ response_action: 'clear' });
  
     const vals = payload.view.state.values;
     const agent = vals.agent_block.agent.selected_option.value;
@@ -144,7 +160,7 @@ app.post('/interactions', async (req, res) => {
     const term = parseInt(vals.term_block.term.selected_option.value) || 12;
     const ap = premium * term;
  
-    const termLabel = { '12': 'Monthly × 12', '10': 'Monthly × 10', '1': 'One-time' }[String(term)];
+    const termLabel = { '12': 'Monthly x 12', '10': 'Monthly x 10', '1': 'One-time' }[String(term)];
  
     const message = [
       `:trophy: *DEAL CLOSED* :trophy:`,
@@ -157,8 +173,10 @@ app.post('/interactions', async (req, res) => {
       `━━━━━━━━━━━━━━━━━━━━━━`
     ].join('\n');
  
+    console.log('Posting message to channel:', WINS_CHANNEL);
+ 
     try {
-      await axios.post('https://slack.com/api/chat.postMessage', {
+      const result = await axios.post('https://slack.com/api/chat.postMessage', {
         channel: WINS_CHANNEL,
         text: message,
         username: 'Money Maker',
@@ -169,10 +187,12 @@ app.post('/interactions', async (req, res) => {
           'Content-Type': 'application/json'
         }
       });
+      console.log('Post result:', JSON.stringify(result.data));
     } catch (err) {
       console.error('Error posting message:', err.response?.data || err.message);
     }
   } else {
+    console.log('Unhandled interaction type:', payload.type);
     res.status(200).send('');
   }
 });
@@ -181,3 +201,4 @@ app.get('/', (req, res) => res.send('Deal Modal Server is running!'));
  
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+ 
