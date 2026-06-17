@@ -16,13 +16,140 @@ console.log('SLACK_BOT_TOKEN set:', !!SLACK_BOT_TOKEN);
 console.log('AIRTABLE_TOKEN set:', !!AIRTABLE_TOKEN);
 console.log('AIRTABLE_BASE_ID:', AIRTABLE_BASE_ID);
 
+const AGENTS = [
+  'Cameron Anderson',
+  'Jovon Stewart',
+  'Kinley Daudin',
+  'Chanse Fearon',
+  'Braeden Normil',
+  'Tyler Olajide',
+  'Shawn Boodhan'
+];
+
+const CARRIERS = [
+  'Ethos',
+  'Americo',
+  'American Amicable',
+  'F&G',
+  'Aetna',
+  'CoreBridge',
+  'GTL',
+  'Goldstar'
+];
+
+const STANDARD_PRODUCTS = [
+  'Term Life',
+  'Whole Life',
+  'Final Expense',
+  'Indexed Universal Life (IUL)',
+  'Universal Life'
+];
+
+const GOLDSTAR_PRODUCTS = [
+  'Principal Guard',
+  'Tower Guard',
+  'TruCore',
+  'Americare'
+];
+
+function opt(label) {
+  return { text: { type: 'plain_text', text: label }, value: label };
+}
+
+// Build the modal view. Product options + term field depend on the carrier.
+function buildView(selectedCarrier) {
+  const isGoldstar = selectedCarrier === 'Goldstar';
+  const productList = isGoldstar ? GOLDSTAR_PRODUCTS : STANDARD_PRODUCTS;
+
+  const carrierElement = {
+    type: 'static_select',
+    action_id: 'carrier',
+    placeholder: { type: 'plain_text', text: 'Select carrier...' },
+    options: CARRIERS.map(opt)
+  };
+  if (selectedCarrier) {
+    carrierElement.initial_option = opt(selectedCarrier);
+  }
+
+  const blocks = [
+    {
+      type: 'input',
+      block_id: 'agent_block',
+      label: { type: 'plain_text', text: 'Agent Name' },
+      element: {
+        type: 'static_select',
+        action_id: 'agent',
+        placeholder: { type: 'plain_text', text: 'Select your name...' },
+        options: AGENTS.map(opt)
+      }
+    },
+    {
+      type: 'input',
+      block_id: 'carrier_block',
+      dispatch_action: true,
+      label: { type: 'plain_text', text: 'Carrier' },
+      element: carrierElement
+    },
+    {
+      type: 'input',
+      block_id: 'product_block',
+      label: { type: 'plain_text', text: 'Product' },
+      element: {
+        type: 'static_select',
+        action_id: 'product',
+        placeholder: { type: 'plain_text', text: 'Select product...' },
+        options: productList.map(opt)
+      }
+    },
+    {
+      type: 'input',
+      block_id: 'premium_block',
+      label: { type: 'plain_text', text: 'Monthly Premium ($)' },
+      element: {
+        type: 'plain_text_input',
+        action_id: 'premium',
+        placeholder: { type: 'plain_text', text: 'e.g. 148' }
+      }
+    }
+  ];
+
+  // Goldstar is month-to-month, so no term field for it
+  if (!isGoldstar) {
+    blocks.push({
+      type: 'input',
+      block_id: 'term_block',
+      optional: true,
+      label: { type: 'plain_text', text: 'Policy Term' },
+      element: {
+        type: 'static_select',
+        action_id: 'term',
+        placeholder: { type: 'plain_text', text: 'Select term...' },
+        options: [
+          { text: { type: 'plain_text', text: 'Monthly x 12' }, value: '12' },
+          { text: { type: 'plain_text', text: 'Monthly x 10' }, value: '10' },
+          { text: { type: 'plain_text', text: 'One-time / Single Premium' }, value: '1' }
+        ]
+      }
+    });
+  }
+
+  return {
+    type: 'modal',
+    callback_id: 'deal_modal',
+    title: { type: 'plain_text', text: 'Post a Closed Deal' },
+    submit: { type: 'plain_text', text: 'Post Deal' },
+    close: { type: 'plain_text', text: 'Cancel' },
+    blocks
+  };
+}
+
 // Write a deal into the Airtable Deals table (starts as "Pending Payment")
 async function writeToAirtable(deal) {
   if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
     console.log('Airtable not configured — skipping write');
     return;
   }
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const today = new Date().toISOString().split('T')[0];
 
   try {
     const result = await axios.post(
@@ -57,115 +184,11 @@ app.post('/deal', async (req, res) => {
   console.log('Received /deal command');
   res.status(200).send('');
 
-  const triggerId = req.body.trigger_id;
-  console.log('trigger_id:', triggerId);
-
-  const modal = {
-    trigger_id: triggerId,
-    view: {
-      type: 'modal',
-      callback_id: 'deal_modal',
-      title: { type: 'plain_text', text: 'Post a Closed Deal' },
-      submit: { type: 'plain_text', text: 'Post Deal' },
-      close: { type: 'plain_text', text: 'Cancel' },
-      blocks: [
-        {
-          type: 'input',
-          block_id: 'agent_block',
-          label: { type: 'plain_text', text: 'Agent Name' },
-          element: {
-            type: 'static_select',
-            action_id: 'agent',
-            placeholder: { type: 'plain_text', text: 'Select your name...' },
-            options: [
-              'Cameron Anderson',
-              'Jovon Stewart',
-              'Kinley Daudin',
-              'Chanse Fearon',
-              'Braeden Normil',
-              'Tyler Olajide',
-              'Shawn Boodhan'
-            ].map(name => ({
-              text: { type: 'plain_text', text: name },
-              value: name
-            }))
-          }
-        },
-        {
-          type: 'input',
-          block_id: 'carrier_block',
-          label: { type: 'plain_text', text: 'Carrier' },
-          element: {
-            type: 'static_select',
-            action_id: 'carrier',
-            placeholder: { type: 'plain_text', text: 'Select carrier...' },
-            options: [
-              'Ethos',
-              'Americo',
-              'American Amicable',
-              'F&G',
-              'Aetna',
-              'CoreBridge',
-              'GTL',
-              'Goldstar'
-            ].map(c => ({
-              text: { type: 'plain_text', text: c },
-              value: c
-            }))
-          }
-        },
-        {
-          type: 'input',
-          block_id: 'product_block',
-          label: { type: 'plain_text', text: 'Product' },
-          element: {
-            type: 'static_select',
-            action_id: 'product',
-            placeholder: { type: 'plain_text', text: 'Select product...' },
-            options: [
-              'Term Life',
-              'Whole Life',
-              'Final Expense',
-              'Indexed Universal Life (IUL)',
-              'Universal Life'
-            ].map(p => ({
-              text: { type: 'plain_text', text: p },
-              value: p
-            }))
-          }
-        },
-        {
-          type: 'input',
-          block_id: 'premium_block',
-          label: { type: 'plain_text', text: 'Monthly Premium ($)' },
-          element: {
-            type: 'plain_text_input',
-            action_id: 'premium',
-            placeholder: { type: 'plain_text', text: 'e.g. 148' }
-          }
-        },
-        {
-          type: 'input',
-          block_id: 'term_block',
-          optional: true,
-          label: { type: 'plain_text', text: 'Policy Term (skip for Goldstar)' },
-          element: {
-            type: 'static_select',
-            action_id: 'term',
-            placeholder: { type: 'plain_text', text: 'Select term...' },
-            options: [
-              { text: { type: 'plain_text', text: 'Monthly x 12' }, value: '12' },
-              { text: { type: 'plain_text', text: 'Monthly x 10' }, value: '10' },
-              { text: { type: 'plain_text', text: 'One-time / Single Premium' }, value: '1' }
-            ]
-          }
-        }
-      ]
-    }
-  };
-
   try {
-    const result = await axios.post('https://slack.com/api/views.open', modal, {
+    const result = await axios.post('https://slack.com/api/views.open', {
+      trigger_id: req.body.trigger_id,
+      view: buildView(null)
+    }, {
       headers: {
         Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
         'Content-Type': 'application/json'
@@ -177,7 +200,7 @@ app.post('/deal', async (req, res) => {
   }
 });
 
-// Handle modal submission
+// Handle interactions (carrier change + final submit)
 app.post('/interactions', async (req, res) => {
   console.log('Received interaction');
 
@@ -185,12 +208,34 @@ app.post('/interactions', async (req, res) => {
   try {
     payload = JSON.parse(req.body.payload);
     console.log('Payload type:', payload.type);
-    console.log('Callback ID:', payload.view?.callback_id);
   } catch (e) {
     console.error('Failed to parse payload:', e.message);
     return res.status(200).send('');
   }
 
+  // Carrier was changed — swap the product list (and term field)
+  if (payload.type === 'block_actions') {
+    res.status(200).send('');
+    const action = (payload.actions || []).find(a => a.action_id === 'carrier');
+    if (!action) return;
+    const selectedCarrier = action.selected_option?.value;
+    try {
+      await axios.post('https://slack.com/api/views.update', {
+        view_id: payload.view.id,
+        view: buildView(selectedCarrier)
+      }, {
+        headers: {
+          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (err) {
+      console.error('views.update error:', err.response?.data || err.message);
+    }
+    return;
+  }
+
+  // Final submission
   if (payload.type === 'view_submission' && payload.view.callback_id === 'deal_modal') {
     res.status(200).json({ response_action: 'clear' });
 
@@ -205,7 +250,6 @@ app.post('/interactions', async (req, res) => {
 
     const isGoldstar = deal.carrier === 'Goldstar';
 
-    // Build the Monthly Premium / Term lines depending on carrier
     let premiumLine;
     let termLine;
     if (isGoldstar) {
@@ -229,7 +273,6 @@ app.post('/interactions', async (req, res) => {
       `━━━━━━━━━━━━━━━━━━━━━━`
     ].join('\n');
 
-    // Post the celebration to Slack
     try {
       const result = await axios.post('https://slack.com/api/chat.postMessage', {
         channel: WINS_CHANNEL,
@@ -247,13 +290,11 @@ app.post('/interactions', async (req, res) => {
       console.error('Error posting message:', err.response?.data || err.message);
     }
 
-    // Log the deal into Airtable
     await writeToAirtable(deal);
-
-  } else {
-    console.log('Unhandled interaction type:', payload.type);
-    res.status(200).send('');
+    return;
   }
+
+  res.status(200).send('');
 });
 
 app.get('/', (req, res) => res.send('Deal Modal Server is running!'));
