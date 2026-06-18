@@ -23,7 +23,8 @@ const AGENTS = [
   'Chanse Fearon',
   'Braeden Normil',
   'Tyler Olajide',
-  'Shawn Boodhan'
+  'Shawn Boodhan',
+  'Abdur Wilson'
 ];
 
 const CARRIERS = [
