@@ -24,7 +24,8 @@ const AGENTS = [
   'Braeden Normil',
   'Tyler Olajide',
   'Shawn Boodhan',
-  'Abdur Wilson'
+  'Abdur Wilson',
+  'Xavian Mitchell'
 ];
 
 const CARRIERS = [
@@ -35,7 +36,8 @@ const CARRIERS = [
   'Aetna',
   'CoreBridge',
   'GTL',
-  'Goldstar'
+  'Goldstar',
+  'United Health'
 ];
 
 const STANDARD_PRODUCTS = [
@@ -46,21 +48,27 @@ const STANDARD_PRODUCTS = [
   'Universal Life'
 ];
 
-const GOLDSTAR_PRODUCTS = [
-  'Principal Guard',
-  'Tower Guard',
-  'TruCore',
-  'Americare'
-];
+// Carriers with their own product list (everything else uses STANDARD_PRODUCTS)
+const CARRIER_PRODUCTS = {
+  'Goldstar': ['Principal Guard', 'Tower Guard', 'TruCore', 'Americare'],
+  'United Health': ['Health ProtectGuard']
+};
+
+// Carriers that are month-to-month (no policy term, no AP)
+const MONTH_TO_MONTH_CARRIERS = ['Goldstar', 'United Health'];
 
 function opt(label) {
   return { text: { type: 'plain_text', text: label }, value: label };
 }
 
+function isMonthToMonth(carrier) {
+  return MONTH_TO_MONTH_CARRIERS.includes(carrier);
+}
+
 // Build the modal view. Product options + term field depend on the carrier.
 function buildView(selectedCarrier) {
-  const isGoldstar = selectedCarrier === 'Goldstar';
-  const productList = isGoldstar ? GOLDSTAR_PRODUCTS : STANDARD_PRODUCTS;
+  const monthToMonth = isMonthToMonth(selectedCarrier);
+  const productList = CARRIER_PRODUCTS[selectedCarrier] || STANDARD_PRODUCTS;
 
   const carrierElement = {
     type: 'static_select',
@@ -114,8 +122,8 @@ function buildView(selectedCarrier) {
     }
   ];
 
-  // Goldstar is month-to-month, so no term field for it
-  if (!isGoldstar) {
+  // Month-to-month carriers have no term field
+  if (!monthToMonth) {
     blocks.push({
       type: 'input',
       block_id: 'term_block',
@@ -249,11 +257,11 @@ app.post('/interactions', async (req, res) => {
       term: parseInt(vals.term_block?.term?.selected_option?.value) || 12
     };
 
-    const isGoldstar = deal.carrier === 'Goldstar';
+    const monthToMonth = isMonthToMonth(deal.carrier);
 
     let premiumLine;
     let termLine;
-    if (isGoldstar) {
+    if (monthToMonth) {
       premiumLine = `:moneybag: *Monthly Premium:* $${deal.premium.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
       termLine = `:calendar: *Term:* Month-to-Month`;
     } else {
