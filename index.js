@@ -25,7 +25,11 @@ const AGENTS = [
   'Tyler Olajide',
   'Shawn Boodhan',
   'Abdur Wilson',
-  'Xavian Mitchell'
+  'Xavian Mitchell',
+  'Sharick Anderson',
+  'James Riha',
+  'Omar Medrano',
+  'Sebastian Perez'
 ];
 
 const CARRIERS = [
