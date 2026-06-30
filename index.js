@@ -19,7 +19,7 @@ console.log('AIRTABLE_BASE_ID:', AIRTABLE_BASE_ID);
 const AGENTS = [
   'Monica Ortiz',
   'Jovon Stewart',
-  'Kinley Daudin',
+  'Jul',
   'Chanse Fearon',
   'Braeden Normil',
   'Tyler Olajide',
